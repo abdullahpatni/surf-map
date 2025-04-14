@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://unpkg.com/maplibre-gl@v5.0.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@v5.0.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        #map {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        maplibregl.setRTLTextPlugin('https://cdn.maptiler.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js');
+
+        /* Global Vars */
+        let communityData, secret;
+
+        /* Getting data from Local File */
+        function getRequiredData(params) {
+            fetch('./Data/community_labels.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    communityData = data;
+                })
+                .catch(error => console.error('Error loading JSON:', error));
+
+            fetch('./secret.json')
+                .then(response => response.json())
+                .then(data => {
+                    secret = data;
+                    initMap();
+                });
+        }
+
+        /* Map Code */
+        function initMap() {
+            const map = new maplibregl.Map({
+                container: 'map',
+                style: 'https://api.maptiler.com/maps/streets-v2/style.json?key=' + secret.maptiler,
+                center: [46.7596333, 24.6674610],
+                zoom: 13
+            });
+
+            /* Controls */
+            map.addControl(new maplibregl.NavigationControl({
+                visualizePitch: true,
+                visualizeRoll: true,
+                showZoom: true,
+                showCompass: true,
+            }));
+            map.addControl(new maplibregl.FullscreenControl({ container: document.querySelector('body') }));
+            const scale = new maplibregl.ScaleControl({ maxWidth: 80, unit: 'metric' });
+            map.addControl(scale);
+
+            /* Creating Layer */
+            map.on('load', async () => {
+                /* Show Communities */
+                map.addSource('communities', {
+                    type: 'geojson',
+                    data: communityData
+                });
+                map.addLayer({
+                    id: 'communities-labels',
+                    type: 'symbol',
+                    source: 'communities',
+                    layout: {
+                        'text-field': ['get', 'NAME2'],  // Use Arabic or any name
+                        'text-font': ['Arial Unicode MS Regular'],
+                        'text-size': 16,
+                        'text-offset': [0, 0.6],
+                        'text-anchor': 'top'
+                    },
+                    paint: {
+                        'text-color': '#306e4c',
+                        'text-halo-color': '#fff',
+                        'text-halo-width': 1.5
+                    }
+                });
+
+                /* Show Red Line */
+                const response = await fetch('https://api.tomtom.com/traffic/services/4/flowSegmentData/relative0/10/json?point=24.6674610%2C46.7596333&&unit=KMPH&openLr=false&key=' + secret.tomtom);
+                const trafficData = await response.json();
+
+                const coords = trafficData.flowSegmentData.coordinates.coordinate.map(c => [c.longitude, c.latitude]);
+
+                map.addSource('traffic', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: [{
+                            type: 'Feature',
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: coords
+                            },
+                            properties: {
+                                speed: trafficData.flowSegmentData.currentSpeed,
+                                'color': '#F7455D'
+                            }
+                        }]
+                    }
+                });
+
+                map.addLayer({
+                    id: 'traffic-line',
+                    type: 'line',
+                    source: 'traffic',
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    paint: {
+                        'line-color': '#FF0000',
+                        'line-width': 5,
+                        'line-opacity': 0.6
+                    }
+                });
+
+                /* Traffic Tile Source with Dynamic Tile URLs */
+                map.addSource('tomtom-traffic', {
+                    type: 'raster',
+                    tiles: [
+                        'https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?tileSize=256&key=' + secret.tomtom
+                    ],
+                    tileSize: 256
+                });
+
+                map.addLayer({
+                    id: 'tomtom-traffic-layer',
+                    type: 'raster',
+                    source: 'tomtom-traffic',
+                    paint: {
+                        'raster-opacity': 0.8
+                    }
+                });
+            });
+        }
+
+        getRequiredData();
+    </script>
+</body>
+
+</html>
