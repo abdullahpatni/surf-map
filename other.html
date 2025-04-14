@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://unpkg.com/maplibre-gl@v5.0.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@v5.0.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <style>
+        #map {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+
+        .maplibregl-popup {
+            max-width: 400px;
+            font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <p>
+        <a href="https://www.maptiler.com/copyright/" target="_blank">© MapTiler</a>
+        <a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>
+    </p>
+
+    <script>
+        // Optional: Enable RTL text support
+        maplibregl.setRTLTextPlugin('https://cdn.maptiler.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js');
+
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://api.maptiler.com/maps/streets-v2/style.json?key=vypZ6pPSrgdOIzKYkaZI',
+            center: [46.7596333, 24.6674610],
+            zoom: 13
+        });
+
+        map.addControl(new maplibregl.NavigationControl({
+            visualizePitch: true,
+            visualizeRoll: true,
+            showZoom: true,
+            showCompass: true,
+        }));
+
+        map.on('load', () => {
+            // Custom point layer
+            map.addSource('my_area', {
+                type: 'geojson',
+                data: {
+                    type: "FeatureCollection",
+                    features: [
+                        {
+                            type: "Feature",
+                            geometry: {
+                                type: "Point",
+                                coordinates: [73.8577249623668, 18.5242704643255]
+                            },
+                            properties: {
+                                description: "📍 Abdullah stays here!"
+                            }
+                        }
+                    ]
+                }
+            });
+
+            map.addLayer({
+                id: 'circle-point',
+                type: 'circle',
+                source: 'my_area',
+                paint: {
+                    'circle-radius': 6,
+                    'circle-color': '#FFAA01',
+                    'circle-opacity': 0.8
+                }
+            });
+
+            // Popup for custom point
+            map.on('click', 'circle-point', (e) => {
+                const coords = e.features[0].geometry.coordinates.slice();
+                const desc = e.features[0].properties.description;
+
+                new maplibregl.Popup()
+                    .setLngLat(coords)
+                    .setHTML(`<strong>${desc}</strong>`)
+                    .addTo(map);
+            });
+
+            map.on('mouseenter', 'circle-point', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', 'circle-point', () => {
+                map.getCanvas().style.cursor = '';
+            });
+
+            // Query built-in POIs (place of interest) like restaurants, cafes etc.
+            map.on('click', function (e) {
+                const features = map.queryRenderedFeatures(e.point, {
+                    layers: ['Food', 'Shopping', 'Education', 'Tourism', 'Station'] // <-- choose what you want
+                });
+
+                if (features.length > 0) {
+                    const f = features[0];
+                    const props = Object.entries(f.properties)
+                        .map(([key, val]) => `<strong>${key}:</strong> ${val}`)
+                        .join('<br/>');
+
+                    new maplibregl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<div>${props}</div>`)
+                        .addTo(map);
+                }
+            });
+
+
+        });
+
+        map.addControl(new maplibregl.FullscreenControl({ container: document.querySelector('body') }));
+
+        const scale = new maplibregl.ScaleControl({ maxWidth: 80, unit: 'metric' });
+        map.addControl(scale);
+    </script>
+</body>
+
+</html>

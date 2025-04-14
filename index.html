@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Maplibre with Mapbox Style</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+    <!-- Maplibre GL JS -->
+    <script src="https://unpkg.com/maplibre-gl@^5.3.0/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@^5.3.0/dist/maplibre-gl.css" rel="stylesheet" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <script>
+        // Set up your Mapbox key (replace with your key)
+        const mapboxKey = 'sk.eyJ1IjoiYWJkdWxsYWhwYXRuaSIsImEiOiJjbTlmczJ6ejcwNTVtMmlxdG56YjVlcDR5In0.uloW6SeMx8GNiDFzyHbOkQ'; // Your Mapbox Access Token
+
+        // Manually transform Mapbox URL to an API-compatible URL
+        const transformMapboxUrl = (url) => {
+            if (url.startsWith('mapbox://')) {
+                const apiUrl = url.replace('mapbox://', 'https://api.mapbox.com/');
+                return `${apiUrl}?access_token=${mapboxKey}`;
+            }
+            return url; // If it's not a Mapbox URL, return as is
+        };
+
+        // Transform Request function
+        const transformRequest = (url, resourceType) => {
+            return { url: transformMapboxUrl(url) };
+        };
+
+        // Initialize Maplibre map with Mapbox style
+        const map = new maplibregl.Map({
+            container: 'map',
+            center: [0, 0], // Starting position [lng, lat]
+            zoom: 2, // Starting zoom
+            // style: 'mapbox://styles/mapbox/satellite-streets-v11', // Mapbox style URL
+            style: 'mapbox://styles/v1/abdullahpatni/cm9fs6qwp00li01s4eepxby4f', // Mapbox style URL
+            transformRequest: transformRequest // Custom transform request function
+        });
+    </script>
+</body>
+
+</html>
