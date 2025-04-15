@@ -126,24 +126,62 @@
                 });
 
                 /* Traffic Tile Source with Dynamic Tile URLs */
-                map.addSource('tomtom-traffic', {
-                    type: 'raster',
+                // map.addSource('tomtom-traffic', {
+                //     type: 'raster',
+                //     tiles: [
+                //         'https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?tileSize=256&key=' + secret.tomtom
+                //     ],
+                //     tileSize: 256
+                // });
+
+                // map.addLayer({
+                //     id: 'tomtom-traffic-layer',
+                //     type: 'raster',
+                //     source: 'tomtom-traffic',
+                //     paint: {
+                //         'raster-opacity': 0.8
+                //     }
+                // });
+
+                /* Traffic line via Raster Tiles */
+                map.addSource('tomtom-traffic-vector', {
+                    type: 'vector',
                     tiles: [
-                        'https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?tileSize=256&key=' + secret.tomtom
+                        `https://api.tomtom.com/traffic/map/4/tile/flow/absolute/{z}/{x}/{y}.pbf?key=${secret.tomtom}`
                     ],
-                    tileSize: 256
+                    minzoom: 0,
+                    maxzoom: 22
                 });
 
                 map.addLayer({
                     id: 'tomtom-traffic-layer',
-                    type: 'raster',
-                    source: 'tomtom-traffic',
+                    type: 'line',
+                    source: 'tomtom-traffic-vector',
+                    'source-layer': 'Traffic flow', // Actual source layer name
                     paint: {
-                        'raster-opacity': 0.8
-                    }
+                        'line-color': [
+                            'match',
+                            ['get', 'traffic_level'],
+                            0, '#00FF00',
+                            1, '#FFFF00',
+                            2, '#FFA500',
+                            3, '#FF0000',
+                            '#000000'
+                        ],
+                        'line-width': 3
+                    },
+                    filter: ['==', ['get', 'traffic_level'], 3]
+                });
+
+                map.on('click', (e) => {
+                    const features = map.queryRenderedFeatures(e.point, {
+                        layers: ['tomtom-traffic-layer']
+                    });
+                    console.log(features.map(f => f.properties));
                 });
             });
         }
+
 
         getRequiredData();
     </script>
