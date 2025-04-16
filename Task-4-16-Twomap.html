@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta property="og:description" content="Synchronize MapLibre GL JS maps with the sync-move plugin." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://unpkg.com/maplibre-gl@v5.0.1/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@v5.0.1/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/@mapbox/mapbox-gl-sync-move@0.3.1"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        #map1,
+        #map2 {
+            height: 100%;
+            width: 100%;
+        }
+
+        .maps {
+            display: flex;
+            gap: 2%;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="maps">
+        <div id="map1"></div>
+        <div id="map2"></div>
+    </div>
+    <script>
+        maplibregl.setRTLTextPlugin('https://cdn.maptiler.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js');
+
+        let communityData, secret, data2022;
+
+        function getRequiredData(params) {
+            fetch('./Data/community_labels.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    communityData = data;
+                })
+                .catch(error => console.error('Error loading JSON:', error));
+            fetch('./Data/Eastern Ring Road - Northbound Dec 2022.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    data2022 = data;
+                })
+                .catch(error => console.error('Error loading JSON:', error));
+
+            fetch('./secret.json')
+                .then(response => response.json())
+                .then(data => {
+                    secret = data;
+                    initMap();
+                });
+        }
+
+        function initMap() {
+            const map1 = new maplibregl.Map({
+                container: 'map1',
+                style: 'https://api.maptiler.com/maps/streets-v2/style.json?key=' + secret.maptiler,
+                center: [46.7596333, 24.6674610],
+                zoom: 13
+            });
+
+            map1.addControl(new maplibregl.NavigationControl({
+                visualizePitch: true,
+                visualizeRoll: true,
+                showZoom: true,
+                showCompass: true,
+            }));
+            map1.addControl(new maplibregl.FullscreenControl({ container: document.querySelector('body') }));
+            const scale = new maplibregl.ScaleControl({ maxWidth: 80, unit: 'metric' });
+            map1.addControl(scale);
+            map1.on('load', async () => {
+                map1.addSource('communities', {
+                    type: 'geojson',
+                    data: communityData
+                });
+                map1.addLayer({
+                    id: 'communities-labels',
+                    type: 'symbol',
+                    source: 'communities',
+                    layout: {
+                        'text-field': ['get', 'NAME2'],
+                        'text-font': ['Arial Unicode MS Regular'],
+                        'text-size': 16,
+                        'text-offset': [0, 0.6],
+                        'text-anchor': 'top'
+                    },
+                    paint: {
+                        'text-color': '#306e4c',
+                        'text-halo-color': '#fff',
+                        'text-halo-width': 1.5
+                    }
+                });
+
+
+                const geoJSONData = processTrafficData(data2022.features);
+
+                console.log(geoJSONData);
+
+                // Add a new source for the GeoJSON data
+                map1.addSource('trafficDataSource', {
+                    type: 'geojson',
+                    data: geoJSONData
+                });
+
+                // Add a new layer using the source
+                map1.addLayer({
+                    id: 'trafficDataLayer',
+                    type: 'line', // You can adjust this type based on your geometry type
+                    source: 'trafficDataSource',
+                    paint: {
+                        'line-width': 3, // Set the line width
+
+                        // Dynamically change line color based on the harmonicAverageSpeed
+                        'line-color': [
+                            "interpolate",
+                            ["linear"],
+                            ["number", ["get", "harmonicAverageSpeed"]], // Access the harmonicAverageSpeed property
+                            0, "gray",         // Speed 0 -> gray
+                            10, "orangered",   // Speed 10 -> orangered
+                            30, "tomato",      // Speed 30 -> tomato
+                            50, "goldenrod",   // Speed 50 -> goldenrod
+                            70, "yellow",      // Speed 70 -> yellow
+                            100, "limegreen",  // Speed 100 -> limegreen
+                            120, "green"       // Speed 120 -> green
+                        ]
+                    }
+                })
+                map1.on('click', (e) => {
+                    const features = map1.queryRenderedFeatures(e.point, {
+                        layers: ['trafficDataLayer']
+                    });
+                    console.log(features.map(f => f.properties));
+                });
+            });
+
+            const map2 = new maplibregl.Map({
+                container: 'map2',
+                style: 'https://api.maptiler.com/maps/streets-v2/style.json?key=' + secret.maptiler,
+                center: [46.7596333, 24.6674610],
+                zoom: 13
+            });
+            map2.addControl(new maplibregl.NavigationControl({
+                visualizePitch: true,
+                visualizeRoll: true,
+                showZoom: true,
+                showCompass: true,
+            }));
+            map2.addControl(new maplibregl.FullscreenControl({ container: document.querySelector('body') }));
+            map2.addControl(scale);
+
+            map2.on('load', async () => {
+                map2.addSource('communities', {
+                    type: 'geojson',
+                    data: communityData
+                });
+                map2.addLayer({
+                    id: 'communities-labels',
+                    type: 'symbol',
+                    source: 'communities',
+                    layout: {
+                        'text-field': ['get', 'NAME2'],
+                        'text-font': ['Arial Unicode MS Regular'],
+                        'text-size': 16,
+                        'text-offset': [0, 0.6],
+                        'text-anchor': 'top'
+                    },
+                    paint: {
+                        'text-color': '#306e4c',
+                        'text-halo-color': '#fff',
+                        'text-halo-width': 1.5
+                    }
+                });
+            });
+
+            syncMaps(map1, map2);
+        }
+
+        getRequiredData();
+
+        function processTrafficData(trafficData) {
+            const features = trafficData
+                .filter(item => item.properties.segmentTimeResults && Array.isArray(item.properties.segmentTimeResults)) // only keep items with segmentTimeResults
+                .map(item => {
+                    const harmonic = item.properties.segmentTimeResults.find(st => st.timeSet === 2);
+
+                    return {
+                        type: "Feature",
+                        geometry: item.geometry,
+                        properties: {
+                            ...item.properties,
+                            harmonicAverageSpeed: harmonic ? harmonic.harmonicAverageSpeed : null
+                        }
+                    };
+                });
+
+            return {
+                type: "FeatureCollection",
+                features: features
+            };
+        }
+
+
+
+    </script>
+</body>
+
+</html>
